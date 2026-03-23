@@ -8,6 +8,14 @@
         "category": "General",
         "versions": [
             {
+                "version": "1.1.9.0",
+                "changelog": "## Summary\n- fix the Jellyfin plugin setup page redirect so it works from real `/web/...` routes\n- show a visible loading message instead of a blank black page while Jellio settings initialize",
+                "targetAbi": "10.11.0.0",
+                "sourceUrl": "https://github.com/ogstorage25-design/jellio-plus/releases/download/v1.1.9/jellio_1.1.9.0.zip",
+                "checksum": "b4ee4ec3991aa5982d397ce9a75c0576",
+                "timestamp": "2026-03-23T15:12:32Z"
+            },
+            {
                 "version": "1.1.8.0",
                 "changelog": "## Summary\n- add HLS-based Stremio playback streams for better seeking and playback handling\n- expose audio-language variants and subtitle metadata from Jellyfin media sources\n- initialize metadata branch so Jellyfin repository manifest can be published",
                 "targetAbi": "10.11.0.0",
