@@ -1,8 +1,15 @@
 <!DOCTYPE html>
 <div data-role="page" class="page type-interior pluginConfigurationPage">
+    <div style="padding:16px;color:inherit;font-family:sans-serif;">
+        Redirecting to Jellio settings...
+    </div>
     <script type="text/javascript">
-        const basePath = location.pathname.replace(/\/web\/?$/, '/jellio');
-        const newUrl = location.origin + basePath;
-        window.location.replace(newUrl);
+        (function () {
+            const pathname = window.location.pathname || '';
+            const webIndex = pathname.indexOf('/web');
+            const basePath = webIndex >= 0 ? pathname.slice(0, webIndex) : '';
+            const newUrl = window.location.origin + basePath + '/jellio';
+            window.location.replace(newUrl);
+        })();
     </script>
 </div>

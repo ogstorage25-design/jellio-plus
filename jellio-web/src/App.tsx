@@ -7,7 +7,11 @@ function App() {
   const serverInfo = useServerInfo();
 
   if (serverInfo === undefined) {
-    return null;
+    return (
+      <div className="mx-auto max-w-2xl p-6 text-sm text-muted-foreground">
+        Loading Jellio settings...
+      </div>
+    );
   }
 
   if (serverInfo === null) {
