@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace Jellyfin.Plugin.Jellio.Models;
@@ -12,4 +13,12 @@ public class StreamDto
 
     [JsonPropertyName("description")]
     public required string Description { get; set; }
+
+    [JsonPropertyName("subtitles")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IEnumerable<SubtitleDto>? Subtitles { get; set; }
+
+    [JsonPropertyName("behaviorHints")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public StreamBehaviorHintsDto? BehaviorHints { get; set; }
 }

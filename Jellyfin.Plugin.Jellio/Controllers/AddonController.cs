@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Mime;
@@ -137,6 +138,88 @@ public class AddonController : ControllerBase
         return meta;
     }
 
+    private static string BuildHlsStreamUrl(
+        string baseUrl,
+        Guid itemId,
+        string mediaSourceId,
+        string authToken,
+        int? audioStreamIndex = null)
+    {
+        var query = new List<string>
+        {
+            $"MediaSourceId={Uri.EscapeDataString(mediaSourceId)}",
+            $"api_key={Uri.EscapeDataString(authToken)}",
+            "EnableAdaptiveBitrateStreaming=true",
+            "EnableTrickplay=true",
+            "EnableAudioVbrEncoding=true",
+            "CopyTimestamps=true",
+            "TranscodingMaxAudioChannels=6",
+        };
+
+        if (audioStreamIndex.HasValue)
+        {
+            query.Add($"AudioStreamIndex={audioStreamIndex.Value.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        return $"{baseUrl}/Videos/{itemId}/master.m3u8?{string.Join("&", query)}";
+    }
+
+    private static IEnumerable<SubtitleDto>? BuildSubtitles(
+        Guid itemId,
+        string mediaSourceId,
+        string baseUrl,
+        string authToken,
+        IEnumerable<MediaStream>? mediaStreams)
+    {
+        if (mediaStreams == null)
+        {
+            return null;
+        }
+
+        var subtitles = mediaStreams
+            .Where(stream => stream.Type == MediaStreamType.Subtitle)
+            .Select(stream => new SubtitleDto
+            {
+                Id = $"{mediaSourceId}-{stream.Index.ToString(CultureInfo.InvariantCulture)}",
+                Url = $"{baseUrl}/Videos/{itemId}/{Uri.EscapeDataString(mediaSourceId)}/Subtitles/{stream.Index.ToString(CultureInfo.InvariantCulture)}/Stream.vtt?api_key={Uri.EscapeDataString(authToken)}",
+                Lang = stream.Language ?? stream.DisplayTitle ?? "und",
+            })
+            .ToList();
+
+        return subtitles.Count == 0 ? null : subtitles;
+    }
+
+    private static string? GetFileNameOrNull(string? path)
+    {
+        return string.IsNullOrWhiteSpace(path) ? null : Path.GetFileName(path);
+    }
+
+    private static string FormatAudioLabel(MediaStream? audioStream)
+    {
+        if (audioStream == null)
+        {
+            return "Default audio";
+        }
+
+        return !string.IsNullOrWhiteSpace(audioStream.DisplayTitle)
+            ? audioStream.DisplayTitle
+            : !string.IsNullOrWhiteSpace(audioStream.Title)
+                ? audioStream.Title
+                : !string.IsNullOrWhiteSpace(audioStream.Language)
+                    ? audioStream.Language
+                    : "Default audio";
+    }
+
+    private static string BuildStreamDescription(
+        string sourceName,
+        MediaStream? audioStream,
+        int subtitleCount)
+    {
+        var audioLabel = FormatAudioLabel(audioStream);
+        var subtitleLabel = subtitleCount == 0 ? "No subtitles" : $"{subtitleCount} subtitle track(s)";
+        return $"{sourceName} | Audio: {audioLabel} | {subtitleLabel}";
+    }
+
     private OkObjectResult GetStreamsResult(Guid userId, IReadOnlyList<BaseItem> items, string authToken)
     {
         var user = _userManager.GetUserById(userId);
@@ -167,16 +250,40 @@ public class AddonController : ControllerBase
                 return Enumerable.Empty<StreamDto>();
             }
 
-            return dto.MediaSources.Select(source =>
+            return dto.MediaSources.SelectMany(source =>
             {
-                var streamUrl = $"{baseUrl}/videos/{dto.Id}/stream?mediaSourceId={source.Id}&api_key={Uri.EscapeDataString(authToken)}&AudioCodec=aac&TranscodingMaxAudioChannels=2&CopyTimestamps=true";
-                LogBuffer.AddLog($"[Stream] Generated stream for {dto.Name} ({dto.Id}): {source.Name} - URL: {streamUrl}", LogLevel.Info);
-                return new StreamDto
+                var subtitleStreams = source.MediaStreams?
+                    .Where(stream => stream.Type == MediaStreamType.Subtitle)
+                    .ToList();
+                var audioStreams = source.MediaStreams?
+                    .Where(stream => stream.Type == MediaStreamType.Audio)
+                    .ToList();
+                var audioVariants = audioStreams?.Count > 0 ? audioStreams : new List<MediaStream?> { null };
+                var subtitles = BuildSubtitles(dto.Id, source.Id, baseUrl, authToken, subtitleStreams);
+                var sourceName = string.IsNullOrWhiteSpace(source.Name) ? "Default source" : source.Name;
+                var baseName = !string.IsNullOrWhiteSpace(dto.Name) ? dto.Name : "Jellio";
+
+                return audioVariants.Select(audioStream =>
                 {
-                    Url = streamUrl,
-                    Name = "Jellio",
-                    Description = source.Name,
-                };
+                    var audioLabel = FormatAudioLabel(audioStream);
+                    var streamUrl = BuildHlsStreamUrl(baseUrl, dto.Id, source.Id, authToken, audioStream?.Index);
+                    var description = BuildStreamDescription(sourceName, audioStream, subtitles?.Count() ?? 0);
+                    LogBuffer.AddLog($"[Stream] Generated stream for {dto.Name} ({dto.Id}): {description} - URL: {streamUrl}", LogLevel.Info);
+
+                    return new StreamDto
+                    {
+                        Url = streamUrl,
+                        Name = $"{baseName} [{audioLabel}]",
+                        Description = description,
+                        Subtitles = subtitles,
+                        BehaviorHints = new StreamBehaviorHintsDto
+                        {
+                            NotWebReady = true,
+                            BingeGroup = $"jellio-{source.Id}-{audioStream?.Index.ToString(CultureInfo.InvariantCulture) ?? "default"}",
+                            Filename = GetFileNameOrNull(source.Path),
+                        },
+                    };
+                });
             });
         }).ToList();
 

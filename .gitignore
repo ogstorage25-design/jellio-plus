@@ -19,6 +19,7 @@ dist
 dist-ssr
 *.local
 *.tsbuildinfo
+.firecrawl/
 .vscode/*
 !.vscode/extensions.json
 .idea
