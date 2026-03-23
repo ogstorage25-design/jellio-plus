@@ -8,6 +8,14 @@
         "category": "General",
         "versions": [
             {
+                "version": "1.1.10.0",
+                "changelog": "## Summary\n- create a fallback Jellyfin addon session when the settings page has no stored token\n- return empty server info results without leaving the plugin config page stuck loading",
+                "targetAbi": "10.11.0.0",
+                "sourceUrl": "https://github.com/ogstorage25-design/jellio-plus/releases/download/v1.1.10/jellio_1.1.10.0.zip",
+                "checksum": "b25617cbd5194d83f7675a3dadae8d5a",
+                "timestamp": "2026-03-23T15:23:07Z"
+            },
+            {
                 "version": "1.1.9.0",
                 "changelog": "## Summary\n- fix the Jellyfin plugin setup page redirect so it works from real `/web/...` routes\n- show a visible loading message instead of a blank black page while Jellio settings initialize",
                 "targetAbi": "10.11.0.0",
