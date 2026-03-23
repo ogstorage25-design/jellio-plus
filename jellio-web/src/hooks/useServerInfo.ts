@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import useAccessToken from '@/hooks/useAccessToken.ts';
-import { getServerInfo } from '@/services/backendService.ts';
+import { getServerInfo, startAddonSession } from '@/services/backendService.ts';
 import type { ServerInfo, Maybe } from '@/types';
 
 const useServerInfo = (): Maybe<ServerInfo> => {
@@ -13,9 +13,27 @@ const useServerInfo = (): Maybe<ServerInfo> => {
     let cancelled = false;
     const fetchServerInfo = async (): Promise<void> => {
       try {
-        const info = await getServerInfo(accessToken ?? undefined);
+        let activeToken = accessToken ?? undefined;
+
+        if (!activeToken) {
+          activeToken = await startAddonSession();
+        }
+
+        let info;
+        try {
+          info = await getServerInfo(activeToken);
+        } catch (error: any) {
+          const status = error?.response?.status as number | undefined;
+          if ((status === 401 || status === 403) && accessToken !== activeToken) {
+            activeToken = await startAddonSession();
+            info = await getServerInfo(activeToken);
+          } else {
+            throw error;
+          }
+        }
+
         if (cancelled) return;
-        setServerInfo({ accessToken: accessToken ?? '', ...info });
+        setServerInfo({ accessToken: activeToken ?? '', ...info });
       } catch (error: any) {
         if (cancelled) return;
         // Only treat explicit auth failures as unauthenticated
@@ -25,14 +43,14 @@ const useServerInfo = (): Maybe<ServerInfo> => {
           return;
         }
         console.warn('Non-auth error fetching server info (will not redirect):', error);
-        // Keep in loading state to avoid redirect loop; retry once quickly
+        // Retry once, then stop loading forever and show the login fallback.
         if (!attemptedOnceRef.current) {
           attemptedOnceRef.current = true;
           setTimeout(() => {
             if (!cancelled) void fetchServerInfo();
           }, 400);
         } else {
-          setServerInfo(undefined);
+          setServerInfo(null);
         }
       }
     };

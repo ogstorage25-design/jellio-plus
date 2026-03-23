@@ -103,12 +103,6 @@ public class WebController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Internal server error." });
         }
 
-        if (libraries == null || libraries.Length == 0)
-        {
-            // LOG: No libraries found for user in GetServerInfo
-            return NotFound(new { error = "No libraries found for user." });
-        }
-
         // LOG: Successfully returned libraries for user in GetServerInfo
         return Ok(new { name = friendlyName, libraries });
     }
